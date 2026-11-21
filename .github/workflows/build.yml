@@ -1,0 +1,48 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --release --locked
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force pacote | Out-Null
+          Copy-Item target/release/claudinho.exe, target/release/claudinho-ui.exe, target/release/claudinho-popup.exe, LICENSE pacote/
+          Compress-Archive -Path pacote/* -DestinationPath Claudinho-windows-x64.zip -Force
+          Get-FileHash Claudinho-windows-x64.zip -Algorithm SHA256 | ForEach-Object { "$($_.Hash)  Claudinho-windows-x64.zip" } | Set-Content Claudinho-windows-x64.zip.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Claudinho-windows-x64
+          path: |
+            Claudinho-windows-x64.zip
+            Claudinho-windows-x64.zip.sha256
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            Claudinho-windows-x64.zip
+            Claudinho-windows-x64.zip.sha256
+          body_path: .github/release-notes.md

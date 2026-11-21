@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claudinho — seu parceiro de mesa com Claude Code</title>
+<meta name="description" content="Uma bolhinha no canto da tela do Windows que deixa um agente Claude Code completo a um clique, com memória longa, lembretes e ~10 MB de RAM.">
+<meta property="og:title" content="Claudinho — Claude Code a um clique, o dia inteiro">
+<meta property="og:description" content="Bolha flutuante para Windows com memória longa, lembretes e economia de quota. Usa a sua assinatura do Claude. Grátis e open source.">
+<meta property="og:image" content="https://gabelfaria.github.io/claudinho/assets/social.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="assets/claudinho.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F5F3EC; --card: #FFFEFB; --borda: #DDD8CA; --texto: #3D3929; --suave: #6F6A59;
+    --acento: #1E9C8C; --acento-escuro: #147568; --acento-claro: #D8F0EC; --chip: #ECE8DD;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1C211F; --card: #242B29; --borda: #34403C; --texto: #EDEAE0; --suave: #A9B3AE;
+            --acento: #3CC2B0; --acento-escuro: #2BA696; --acento-claro: #1F3A36; --chip: #2C3532; }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--texto); font: 16px/1.6 Inter, system-ui, sans-serif; }
+  body:not(.en) [data-l="en"], body.en [data-l="pt"] { display: none !important; }
+  a { color: var(--acento-escuro); }
+  @media (prefers-color-scheme: dark) { a { color: var(--acento); } }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; }
+  .marca { display: flex; align-items: center; gap: 10px; font: 900 22px Nunito, sans-serif; text-decoration: none; color: var(--texto); }
+  .marca img { width: 34px; height: 34px; }
+  .nav-dir { display: flex; gap: 10px; align-items: center; }
+  .botao { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 10px 18px; font-weight: 600; text-decoration: none; border: 1px solid var(--borda); background: var(--card); color: var(--texto); cursor: pointer; font-size: 15px; }
+  .botao.forte { background: var(--acento); border-color: var(--acento); color: #fff; }
+  .botao.forte:hover { background: var(--acento-escuro); }
+  .hero { display: grid; grid-template-columns: 1.1fr .9fr; gap: 48px; align-items: center; padding: 40px 0 70px; }
+  h1 { font: 900 clamp(36px, 6vw, 60px)/1.05 Nunito, sans-serif; margin: 0 0 18px; letter-spacing: -0.5px; }
+  h1 em { font-style: normal; color: var(--acento); }
+  .sub { font-size: 19px; color: var(--suave); margin: 0 0 28px; max-width: 34em; }
+  .instalar { background: var(--card); border: 1px solid var(--borda); border-radius: 16px; padding: 16px; }
+  .instalar small { color: var(--suave); display: block; margin-bottom: 8px; font-weight: 600; }
+  .cmd { display: flex; gap: 10px; align-items: center; background: var(--chip); border-radius: 10px; padding: 10px 10px 10px 14px; }
+  .cmd code { flex: 1; min-width: 0; font: 13.5px/1.4 ui-monospace, Consolas, monospace; overflow-x: auto; white-space: nowrap; }
+  .hero > * { min-width: 0; }
+  .cmd button { flex: none; }
+  .nota { font-size: 13.5px; color: var(--suave); margin-top: 10px; }
+  .vitrine { position: relative; display: flex; justify-content: center; }
+  .vitrine .janela { width: min(360px, 100%); border-radius: 14px; box-shadow: 0 30px 60px -20px rgba(20, 60, 55, .35), 0 0 0 1px var(--borda); }
+  .vitrine .bolha { position: absolute; width: 74px; right: -6px; bottom: -26px; filter: drop-shadow(0 10px 14px rgba(20,60,55,.35)); animation: flutua 4s ease-in-out infinite; }
+  @keyframes flutua { 50% { transform: translateY(-8px); } }
+  @media (prefers-reduced-motion: reduce) { .vitrine .bolha { animation: none; } }
+  section { padding: 60px 0; }
+  h2 { font: 900 clamp(28px, 4vw, 38px)/1.15 Nunito, sans-serif; margin: 0 0 10px; }
+  .lead { color: var(--suave); margin: 0 0 34px; font-size: 17px; }
+  .grade { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .card { background: var(--card); border: 1px solid var(--borda); border-radius: 16px; padding: 22px; }
+  .card .ico { font-size: 26px; width: 48px; height: 48px; display: grid; place-items: center; background: var(--acento-claro); border-radius: 12px; margin-bottom: 12px; }
+  .card h3 { margin: 0 0 6px; font: 800 19px Nunito, sans-serif; }
+  .card p { margin: 0; color: var(--suave); font-size: 15px; }
+  .numeros { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; text-align: center; }
+  .numeros .n { font: 900 40px Nunito, sans-serif; color: var(--acento); line-height: 1.1; }
+  .numeros .t { color: var(--suave); font-size: 14.5px; }
+  .passos { counter-reset: p; display: grid; gap: 14px; padding: 0; list-style: none; }
+  .passos li { counter-increment: p; display: flex; gap: 14px; align-items: flex-start; background: var(--card); border: 1px solid var(--borda); border-radius: 14px; padding: 16px 18px; }
+  .passos li::before { content: counter(p); flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--acento); color: #fff; display: grid; place-items: center; font-weight: 800; }
+  details { background: var(--card); border: 1px solid var(--borda); border-radius: 14px; padding: 14px 18px; margin-bottom: 10px; }
+  summary { cursor: pointer; font-weight: 600; }
+  details p { color: var(--suave); margin: 10px 0 0; }
+  .final { text-align: center; background: var(--acento-claro); border-radius: 24px; padding: 48px 20px; }
+  footer { padding: 36px 0 50px; color: var(--suave); font-size: 13px; text-align: center; }
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; gap: 50px; padding-top: 16px; }
+    .grade { grid-template-columns: 1fr; }
+    .numeros { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="marca" href="#"><img src="assets/claudinho.svg" alt="">Claudinho</a>
+    <div class="nav-dir">
+      <button class="botao" id="idioma" aria-label="Trocar idioma / Switch language">EN</button>
+      <a class="botao" href="https://github.com/gabelfaria/claudinho">GitHub</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div>
+      <h1 data-l="pt">O Claude Code <em>a um clique</em>, o dia inteiro.</h1>
+      <h1 data-l="en">Claude Code <em>one click away</em>, all day long.</h1>
+      <p class="sub" data-l="pt">Uma bolhinha no canto da tela do Windows. Clicou, você está falando com um agente de verdade, que mexe nos seus arquivos, pesquisa, usa o navegador, lembra de você e te avisa na hora certa.</p>
+      <p class="sub" data-l="en">A tiny bubble in the corner of your Windows screen. Click it and you're talking to a real agent that works with your files, searches the web, drives your browser, remembers you and nudges you at the right time.</p>
+      <div class="instalar">
+        <small data-l="pt">Instale com um comando no PowerShell</small>
+        <small data-l="en">Install with one PowerShell command</small>
+        <div class="cmd">
+          <code id="cmd">irm https://raw.githubusercontent.com/gabelfaria/claudinho/main/install.ps1 | iex</code>
+          <button class="botao forte" id="copiar"><span data-l="pt">Copiar</span><span data-l="en">Copy</span></button>
+        </div>
+        <div class="nota" data-l="pt">Grátis e open source. Windows 10/11 + assinatura Claude Pro ou Max. Sem chave de API.</div>
+        <div class="nota" data-l="en">Free and open source. Windows 10/11 + a Claude Pro or Max plan. No API key.</div>
+      </div>
+    </div>
+    <div class="vitrine">
+      <img class="janela" src="assets/chat.png" alt="Janela de conversa do Claudinho / Claudinho chat window">
+      <img class="bolha" src="assets/claudinho.svg" alt="">
+    </div>
+  </header>
+</div>
+
+<section>
+  <div class="wrap">
+    <h2 data-l="pt">Leve no PC. Leve na quota.</h2>
+    <h2 data-l="en">Light on your PC. Light on your quota.</h2>
+    <p class="lead" data-l="pt">Feito para ficar aberto o dia todo sem você sentir.</p>
+    <p class="lead" data-l="en">Built to stay open all day without you noticing.</p>
+    <div class="numeros">
+      <div class="card"><div class="n">~10 MB</div><div class="t" data-l="pt">de RAM com a bolha parada</div><div class="t" data-l="en">of RAM while idle</div></div>
+      <div class="card"><div class="n">0,2 s</div><div class="t" data-l="pt">para abrir a conversa</div><div class="t" data-l="en">to open the chat</div></div>
+      <div class="card"><div class="n">até 100×</div><div class="t" data-l="pt">menos tokens nas tarefas internas</div><div class="t" data-l="en">fewer tokens on background jobs</div></div>
+      <div class="card"><div class="n">0</div><div class="t" data-l="pt">servidores, contas ou telemetria</div><div class="t" data-l="en">servers, accounts or telemetry</div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2 data-l="pt">Tudo o que um parceiro de mesa precisa</h2>
+    <h2 data-l="en">Everything a desk buddy should do</h2>
+    <p class="lead" data-l="pt">Não é mais um chatbot: é o Claude Code completo, num formato que cabe no seu dia.</p>
+    <p class="lead" data-l="en">Not another chatbot: the full Claude Code, shaped to fit your day.</p>
+    <div class="grade">
+      <div class="card"><div class="ico">🫧</div>
+        <h3 data-l="pt">Sempre por perto</h3><h3 data-l="en">Always nearby</h3>
+        <p data-l="pt">Bolha que você arrasta e gruda na borda. Some em jogos em tela cheia e volta depois.</p>
+        <p data-l="en">Drag the bubble anywhere; it snaps to the edge and hides during full-screen games.</p></div>
+      <div class="card"><div class="ico">🛠️</div>
+        <h3 data-l="pt">Agente de verdade</h3><h3 data-l="en">A real agent</h3>
+        <p data-l="pt">Arquivos, PowerShell, web, Chrome, conectores e agentes. Ações delicadas pedem Permitir/Negar.</p>
+        <p data-l="en">Files, PowerShell, web, Chrome, connectors and agents. Sensitive actions ask Allow/Deny.</p></div>
+      <div class="card"><div class="ico">🧠</div>
+        <h3 data-l="pt">Memória longa</h3><h3 data-l="en">Long-term memory</h3>
+        <p data-l="pt">Uma conversa para a vida toda, resumida sozinha. Histórico completo em Markdown no seu disco.</p>
+        <p data-l="en">One conversation for life, summarized automatically. Full history as Markdown on your disk.</p></div>
+      <div class="card"><div class="ico">⏰</div>
+        <h3 data-l="pt">Lembretes falados</h3><h3 data-l="en">Plain-language reminders</h3>
+        <p data-l="pt">"Me lembra às 18h de ligar pro banco." E verificações de hora em hora que só falam quando vale a pena.</p>
+        <p data-l="en">"Remind me at 6pm to call the bank." Plus hourly check-ins that only speak up when it matters.</p></div>
+      <div class="card"><div class="ico">💸</div>
+        <h3 data-l="pt">Economia de quota</h3><h3 data-l="en">Quota-smart</h3>
+        <p data-l="pt">Sonnet conduz, Opus só quando precisa. Mudou de assunto? Ele abre uma sessão leve sozinho.</p>
+        <p data-l="en">Sonnet leads, Opus only when needed. Changed subject? It starts a light session by itself.</p></div>
+      <div class="card"><div class="ico">🔒</div>
+        <h3 data-l="pt">Seu, de verdade</h3><h3 data-l="en">Truly yours</h3>
+        <p data-l="pt">Sem servidor, sem conta nova. Personalidade e regras num prompt.md que você edita.</p>
+        <p data-l="en">No server, no new account. Personality and rules live in a prompt.md you edit.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2 data-l="pt">Pronto em um minuto</h2>
+    <h2 data-l="en">Ready in a minute</h2>
+    <p class="lead" data-l="pt">O instalador faz tudo e não pede administrador.</p>
+    <p class="lead" data-l="en">The installer does it all, no admin rights needed.</p>
+    <ol class="passos">
+      <li><div><b data-l="pt">Cole o comando no PowerShell.</b><b data-l="en">Paste the command into PowerShell.</b>
+        <span data-l="pt">Se faltar o Claude Code, ele instala pelo instalador oficial e abre o login.</span>
+        <span data-l="en">If Claude Code is missing, it installs it with the official installer and opens the login.</span></div></li>
+      <li><div><b data-l="pt">Diga como quer ser chamado.</b><b data-l="en">Tell it your name.</b>
+        <span data-l="pt">Ele entra no menu Iniciar e passa a abrir com o Windows.</span>
+        <span data-l="en">It joins the Start menu and starts with Windows.</span></div></li>
+      <li><div><b data-l="pt">Clique na bolhinha.</b><b data-l="en">Click the bubble.</b>
+        <span data-l="pt">Pronto. Para deixar com a sua cara, edite o prompt.md em %APPDATA%\Claudinho.</span>
+        <span data-l="en">Done. To make it yours, edit prompt.md in %APPDATA%\Claudinho.</span></div></li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2 data-l="pt">Perguntas frequentes</h2>
+    <h2 data-l="en">FAQ</h2>
+    <details><summary data-l="pt">Preciso pagar alguma coisa?</summary><summary data-l="en">Do I need to pay for anything?</summary>
+      <p data-l="pt">O Claudinho é grátis. Ele usa o Claude Code com a sua assinatura do Claude (Pro ou Max), sem chave de API.</p>
+      <p data-l="en">Claudinho is free. It uses Claude Code with your own Claude plan (Pro or Max), no API key.</p></details>
+    <details><summary data-l="pt">Meus dados vão para algum lugar?</summary><summary data-l="en">Where does my data go?</summary>
+      <p data-l="pt">Conversa, memória e configurações ficam em arquivos no seu PC. As mensagens só vão para a Anthropic, pela sua conta do Claude Code. Não há servidor nem telemetria.</p>
+      <p data-l="en">Chat, memory and settings stay in files on your PC. Messages only go to Anthropic through your own Claude Code account. No server, no telemetry.</p></details>
+    <details><summary data-l="pt">Ele pode fazer coisas perigosas no meu PC?</summary><summary data-l="en">Can it do risky things on my PC?</summary>
+      <p data-l="pt">Ele roda no modo de permissão automático do Claude Code: o que é seguro roda direto, e o que precisa de aprovação aparece como Permitir/Negar no chat. As verificações automáticas são só leitura.</p>
+      <p data-l="en">It runs in Claude Code's auto permission mode: safe actions run, anything that needs approval shows up as Allow/Deny in the chat. Automatic check-ins are read-only.</p></details>
+    <details><summary data-l="pt">Funciona no Mac ou no Linux?</summary><summary data-l="en">Does it work on Mac or Linux?</summary>
+      <p data-l="pt">Por enquanto só no Windows 10/11. A bolha e a bandeja usam Win32 direto para ficar leve.</p>
+      <p data-l="en">Windows 10/11 only for now. The bubble and tray use Win32 directly to stay lightweight.</p></details>
+    <details><summary data-l="pt">A interface tem inglês?</summary><summary data-l="en">Is the interface in English?</summary>
+      <p data-l="pt">Os botões estão em português por enquanto; o Claudinho responde no seu idioma. Inglês está nos planos, e contribuições são bem-vindas.</p>
+      <p data-l="en">Buttons are in Portuguese for now; Claudinho replies in your language. An English UI is on the roadmap, and contributions are welcome.</p></details>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="final">
+      <img src="assets/claudinho.svg" width="72" alt="">
+      <h2 data-l="pt">Bora trabalhar junto?</h2>
+      <h2 data-l="en">Shall we get to work?</h2>
+      <p class="lead" data-l="pt">Instale em um minuto, ou dê uma estrela no GitHub para ajudar o projeto.</p>
+      <p class="lead" data-l="en">Install in a minute, or star it on GitHub to help the project.</p>
+      <a class="botao forte" href="https://github.com/gabelfaria/claudinho">⭐ GitHub</a>
+      <a class="botao" href="https://github.com/gabelfaria/claudinho/releases/latest" data-l="pt">Baixar o zip</a>
+      <a class="botao" href="https://github.com/gabelfaria/claudinho/releases/latest" data-l="en">Download zip</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span data-l="pt">O Claudinho é um projeto independente e não oficial. Não tem vínculo, aval nem patrocínio da Anthropic. Claude e Claude Code são marcas da Anthropic, PBC.</span>
+    <span data-l="en">Claudinho is an independent, unofficial project, not affiliated with, endorsed or sponsored by Anthropic. Claude and Claude Code are trademarks of Anthropic, PBC.</span>
+    <br>MIT License
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var b = document.body, t = document.getElementById('idioma');
+    function aplicar(en) { b.classList.toggle('en', en); document.documentElement.lang = en ? 'en' : 'pt-BR'; t.textContent = en ? 'PT' : 'EN'; }
+    var salvo = null;
+    try { salvo = localStorage.getItem('claudinho-lang'); } catch (e) {}
+    aplicar(salvo ? salvo === 'en' : !/^pt/i.test(navigator.language || 'pt'));
+    t.addEventListener('click', function () {
+      var en = !b.classList.contains('en'); aplicar(en);
+      try { localStorage.setItem('claudinho-lang', en ? 'en' : 'pt'); } catch (e) {}
+    });
+    document.getElementById('copiar').addEventListener('click', function () {
+      var c = document.getElementById('cmd').textContent, btn = this;
+      (navigator.clipboard ? navigator.clipboard.writeText(c) : Promise.reject()).then(function () {
+        var o = btn.innerHTML; btn.textContent = '✓'; setTimeout(function () { btn.innerHTML = o; }, 1400);
+      }).catch(function () {});
+    });
+  })();
+</script>
+</body>
+</html>

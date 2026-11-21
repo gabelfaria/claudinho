@@ -133,6 +133,8 @@ struct App {
     escalar: Option<(Modelo, String)>,
     /// o Opus devolveu para o modelo-base — aplica no fim do turno
     devolver: bool,
+    /// rolagem automática do botão do meio: (ponto de âncora, quando apertou)
+    autoscroll: Option<(Pos2, Instant)>,
     /// último pedido do usuário (reenviado numa sessão limpa quando o assunto muda)
     ultimo_pedido: String,
     /// o modelo marcou [[NOVO_ASSUNTO]] — limpa e reenvia no fim do turno
@@ -165,7 +167,7 @@ struct App {
 /// A tela carrega só o fim da conversa; "mostrar antigas" aumenta de 150 em 150.
 const PAGINA: usize = 150;
 /// Limpa a sessão sozinho quando o contexto passa disto (o mínimo fixo do Claude Code é ~53 mil).
-const LIMITE_CONTEXTO: usize = 110_000;
+const LIMITE_CONTEXTO: usize = 85_000;
 /// Limpa a sessão sozinho quando a mensagem chega depois de tanto tempo sem conversa.
 const PAUSA_LIMPA_MIN: i64 = 60;
 /// Modelo que conduz a conversa por padrão (o Opus é chamado quando precisa e devolve para ele).
@@ -199,6 +201,7 @@ impl App {
             tarefas: 0,
             escalar: None,
             devolver: false,
+            autoscroll: None,
             ultimo_pedido: String::new(),
             novo_assunto: false,
             primeiro_turno: false,
@@ -700,8 +703,47 @@ impl eframe::App for App {
             // altura da faixa de digitação: acompanha a caixa (3 a 4 linhas; depois rola)
             let entrada_alt = self.alt_entrada;
             let lista = Rect::from_min_max(Pos2::new(cheio.min.x, cab.max.y + 1.0), Pos2::new(cheio.max.x, cheio.max.y - entrada_alt));
+            // botão do meio = rolagem automática do Windows: clica e solta (fica ativa até outro
+            // clique) ou segura e arrasta (para ao soltar); a velocidade segue a distância da âncora
+            let (meio_down, meio_up, outro_clique, ponteiro) = ctx.input(|i| {
+                (
+                    i.pointer.button_pressed(egui::PointerButton::Middle),
+                    i.pointer.button_released(egui::PointerButton::Middle),
+                    i.pointer.button_pressed(egui::PointerButton::Primary) || i.pointer.button_pressed(egui::PointerButton::Secondary) || i.key_pressed(egui::Key::Escape),
+                    i.pointer.hover_pos(),
+                )
+            });
+            if meio_down {
+                self.autoscroll = match (self.autoscroll, ponteiro) {
+                    (None, Some(p)) if lista.contains(p) => Some((p, Instant::now())),
+                    _ => None,
+                };
+            } else if outro_clique {
+                self.autoscroll = None;
+            } else if meio_up {
+                if let (Some((ancora, t)), Some(p)) = (self.autoscroll, ponteiro) {
+                    if t.elapsed() > Duration::from_millis(350) && (p.y - ancora.y).abs() > 12.0 {
+                        self.autoscroll = None;
+                    }
+                }
+            }
+            let mut delta_auto = 0.0;
+            if let Some((ancora, _)) = self.autoscroll {
+                let dy = ponteiro.map(|p| p.y - ancora.y).unwrap_or(0.0);
+                let fora = (dy.abs() - 10.0).max(0.0) * dy.signum();
+                delta_auto = -fora * 0.25 * (1.0 + fora.abs() / 120.0);
+                ctx.set_cursor_icon(if fora > 0.0 { egui::CursorIcon::ResizeSouth } else if fora < 0.0 { egui::CursorIcon::ResizeNorth } else { egui::CursorIcon::AllScroll });
+                let p = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("autoscroll")));
+                p.circle_filled(ancora, 9.0, CHIP);
+                p.circle_stroke(ancora, 9.0, Stroke::new(1.0, SUAVE));
+                p.text(ancora, egui::Align2::CENTER_CENTER, "↕", egui::FontId::proportional(11.0), SUAVE);
+                ctx.request_repaint();
+            }
             let mut lista_ui = ui.new_child(egui::UiBuilder::new().max_rect(lista.shrink2(Vec2::new(12.0, 6.0))));
             egui::ScrollArea::vertical().stick_to_bottom(true).auto_shrink([false, false]).show(&mut lista_ui, |ui| {
+                if delta_auto != 0.0 {
+                    ui.scroll_with_delta(Vec2::new(0.0, delta_auto));
+                }
                 ui.spacing_mut().item_spacing.y = 8.0;
                 ui.add_space(4.0);
                 if self.conversa.iter().all(|m| m.papel == "lider" || m.papel == "limpar") {

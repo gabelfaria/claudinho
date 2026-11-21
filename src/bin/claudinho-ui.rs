@@ -135,6 +135,8 @@ struct App {
     devolver: bool,
     /// rolagem automática do botão do meio: (ponto de âncora, quando apertou)
     autoscroll: Option<(Pos2, Instant)>,
+    /// já repetiu o pedido numa sessão nova porque a retomada falhou (evita laço)
+    repetiu: bool,
     /// último pedido do usuário (reenviado numa sessão limpa quando o assunto muda)
     ultimo_pedido: String,
     /// o modelo marcou [[NOVO_ASSUNTO]] — limpa e reenvia no fim do turno
@@ -202,6 +204,7 @@ impl App {
             escalar: None,
             devolver: false,
             autoscroll: None,
+            repetiu: false,
             ultimo_pedido: String::new(),
             novo_assunto: false,
             primeiro_turno: false,
@@ -240,10 +243,8 @@ impl App {
         }
         let c = self.ctx.clone();
         let acordar: std::sync::Arc<dyn Fn() + Send + Sync> = std::sync::Arc::new(move || c.request_repaint());
-        let (id, retomar) = match sessao::id_salvo() {
-            Some(id) => (id, true),
-            None => (sessao::uuid4(), false),
-        };
+        // só retoma se o Claude Code chegou a gravar a conversa (senão o --resume falha)
+        let (id, retomar) = sessao::escolher_sessao();
         match Sessao::abrir(&id, retomar, self.lider, self.tx.clone(), acordar) {
             Ok(s) => {
                 if !retomar {
@@ -460,6 +461,19 @@ impl App {
                 }
                 Evento::FimTurno { erro } => {
                     self.pendentes = self.pendentes.saturating_sub(1);
+                    // a sessão retomada não existe mais: abre outra e manda o mesmo pedido, sem erro na tela
+                    let sumiu = erro.is_some() && self.sessao.as_ref().is_some_and(|s| !sessao::transcricao_existe(&s.id));
+                    if sumiu && !std::mem::replace(&mut self.repetiu, true) && !self.ultimo_pedido.is_empty() {
+                        if let Some(s) = self.sessao.take() {
+                            s.encerrar();
+                        }
+                        sessao::esquecer_id();
+                        self.pendentes = 0;
+                        let pedido = self.ultimo_pedido.clone();
+                        self.mandar_para_sessao(&pedido);
+                        continue;
+                    }
+                    self.repetiu = false;
                     if let Some(e) = erro {
                         if !e.contains("interrupt") {
                             self.conversa.push(gravar("sistema", self.lider, &format!("⚠️ {}", e.chars().take(300).collect::<String>())));

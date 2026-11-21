@@ -63,6 +63,22 @@ pub fn esquecer_id() {
     let _ = std::fs::remove_file(arquivo_sessao());
     let _ = std::fs::remove_file(pasta_dia().join("sessao-contexto.txt"));
 }
+/// O Claude Code só grava a conversa (`~/.claude/projects/<pasta>/<id>.jsonl`) na primeira
+/// mensagem. Sessão aberta e fechada sem mensagem não existe: `--resume` dela dá
+/// "No conversation found" (error_during_execution).
+pub fn transcricao_existe(id: &str) -> bool {
+    let home = std::env::var("USERPROFILE").unwrap_or_default();
+    let pasta: String = pasta_projetos().to_string_lossy().chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '-' }).collect();
+    std::path::Path::new(&home).join(".claude").join("projects").join(pasta).join(format!("{id}.jsonl")).exists()
+}
+/// Qual sessão abrir: (id, retomar). Retoma a salva só se ela foi gravada de verdade;
+/// senão cria uma nova (e o app manda o contexto do Claudinho na primeira mensagem).
+pub fn escolher_sessao() -> (String, bool) {
+    match id_salvo() {
+        Some(id) if transcricao_existe(&id) => (id, true),
+        _ => (uuid4(), false),
+    }
+}
 /// Tamanho (tokens) da sessão salva no último turno, para sobreviver a um reinício do chat.
 pub fn salvar_contexto(n: usize) {
     let _ = std::fs::write(pasta_dia().join("sessao-contexto.txt"), n.to_string());
@@ -151,6 +167,8 @@ pub struct Sessao {
     pub iniciou: Arc<AtomicBool>,
     /// tokens de contexto da última chamada da conversa principal (entrada + cache)
     pub contexto: Arc<AtomicUsize>,
+    /// o usuário apertou parar: o fim do turno vem como error_during_execution, mas não é erro
+    interrompido: Arc<AtomicBool>,
     seq: usize,
 }
 
@@ -178,6 +196,7 @@ impl Sessao {
         let tarefas = Arc::new(AtomicUsize::new(0));
         let iniciou = Arc::new(AtomicBool::new(false));
         let contexto = Arc::new(AtomicUsize::new(0));
+        let interrompido = Arc::new(AtomicBool::new(false));
 
         // stderr guardado para explicar quedas
         let erros = Arc::new(Mutex::new(String::new()));
@@ -196,7 +215,7 @@ impl Sessao {
 
         // leitor: transforma o stream-json em eventos para a janela
         if let Some(out) = filho.stdout.take() {
-            let (ent, ult, tar, ini, ctxt) = (entrada.clone(), ultima.clone(), tarefas.clone(), iniciou.clone(), contexto.clone());
+            let (ent, ult, tar, ini, ctxt, parou) = (entrada.clone(), ultima.clone(), tarefas.clone(), iniciou.clone(), contexto.clone(), interrompido.clone());
             let id_sessao = id.to_string();
             std::thread::spawn(move || {
                 let mandar = |v: Value| {
@@ -278,7 +297,9 @@ impl Sessao {
                             }
                         }
                         "result" => {
-                            let erro = if v["is_error"].as_bool().unwrap_or(false) {
+                            let erro = if parou.swap(false, Ordering::Relaxed) {
+                                None
+                            } else if v["is_error"].as_bool().unwrap_or(false) {
                                 let r = v["result"].as_str().unwrap_or("").to_string();
                                 Some(if r.is_empty() { v["subtype"].as_str().unwrap_or("erro").to_string() } else { r })
                             } else {
@@ -294,7 +315,7 @@ impl Sessao {
             });
         }
 
-        let s = Sessao { filho, entrada, id: id.to_string(), modelo, ultima_atividade: ultima, tarefas, iniciou, contexto, seq: 0 };
+        let s = Sessao { filho, entrada, id: id.to_string(), modelo, ultima_atividade: ultima, tarefas, iniciou, contexto, interrompido, seq: 0 };
         s.mandar(json!({"type": "control_request", "request_id": "ini", "request": {"subtype": "initialize"}}));
         Ok(s)
     }
@@ -308,6 +329,7 @@ impl Sessao {
 
     pub fn enviar_texto(&mut self, texto: &str) {
         *self.ultima_atividade.lock().unwrap() = Instant::now();
+        self.interrompido.store(false, Ordering::Relaxed);
         self.mandar(json!({"type": "user", "session_id": "", "parent_tool_use_id": null, "message": {"role": "user", "content": texto}}));
     }
 
@@ -318,6 +340,7 @@ impl Sessao {
     }
 
     pub fn interromper(&mut self) {
+        self.interrompido.store(true, Ordering::Relaxed);
         self.seq += 1;
         self.mandar(json!({"type": "control_request", "request_id": format!("i{}", self.seq), "request": {"subtype": "interrupt"}}));
     }
